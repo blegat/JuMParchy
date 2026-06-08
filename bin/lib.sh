@@ -19,6 +19,11 @@ link() {
   local src="$2"
   local dst="$3"
 
+  if [ ! -e "$src" ]; then
+    fail "$desc: source $src does not exist"
+    exit 1
+  fi
+
   if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
     ok "$desc (already done)"
     return 0
