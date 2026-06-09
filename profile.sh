@@ -1,5 +1,9 @@
 alias gp='git push'
+
+# We only install nvim and not vim so let's make vim shortcut to nvim
 alias vim='nvim'
+
+## Julia shortcuts
 
 jp() {
 	cd ~/.julia/dev
@@ -15,6 +19,7 @@ jclone() {
 
 alias jformat="julia -e 'using JuliaFormatter; format(\"src\"); format(\"test\")'"
 alias jformatall="julia -e 'using JuliaFormatter; format(\".\", verbose=true)'"
+alias pluto="julia -e 'import Pluto; Pluto.run()'"
 
 # Julia REPL for Vim
 jv() {
