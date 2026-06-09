@@ -13,4 +13,4 @@ fi
 
 link "Add Zotero desktop entry" \
   /var/lib/flatpak/exports/share/applications/org.zotero.Zotero.desktop \
-  "$HOME/.local/share/applications/org.zotero.Zotero.desktop"
+  "$HOME/.local/share/applications"

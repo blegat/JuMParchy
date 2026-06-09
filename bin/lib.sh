@@ -24,6 +24,10 @@ link() {
     exit 1
   fi
 
+  if [ -d "$dst" ]; then
+    dst="$dst/$(basename "$src")"
+  fi
+
   if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
     ok "$desc (already done)"
     return 0
