@@ -1,7 +1,22 @@
-# Setup
+# JuMParchy
 
-Setup scripts that I use to configure [omarchy](https://omarchy.org/) for my workflow.
-To try it, simply run
+JuMParchy is an opinionated [JuMP](https://jump.dev/)-flavor derivative of [omarchy](https://omarchy.org/), opinionatedly configured for my workflow.
+
+What does it do ?
+
+- ✓ Replace the omarchy logo by the JuMP logo
+- ✓ Configure NeoVim for Julia in a way that's familiar to the Julia VS code extension
+- ✓ Configure NeoVim for LaTeX
+- ✓ Install Zotero
+
+What does it not do ?
+
+- ✗ Optimize your battery life with JuMP
+- ✗ Install a bitcoin miner on your computer and donate the profits to JuMP
+
+## Installation
+
+First, install [omarchy](https://omarchy.org/), then clone this repo anywhere, `cd` into it and run
 ```sh
 $ bash bin/setup.sh
 ```
