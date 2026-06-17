@@ -7,7 +7,7 @@ if flatpak list --app --columns=application 2>/dev/null | grep -qx org.zotero.Zo
   ok "$desc"
 else
   doing "$desc"
-  "$SCRIPT_DIR/pkg-add" flatpak
+  omarchy-pkg-add flatpak
   flatpak install flathub org.zotero.Zotero
 fi
 

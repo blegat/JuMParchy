@@ -9,13 +9,12 @@ for pkg in "$@"; do
     continue
   fi
 
-  # Not an installed package; it might be a group.
+  # Not an installed package; it might be a group. A single `pacman -Q` over all
+  # members succeeds only if every member is installed (one process, not N).
   members="$(pacman -Sgq "$pkg" 2>/dev/null)"
   if [ -n "$members" ]; then
-    while IFS= read -r member; do
-      pacman -Q "$member" &>/dev/null || exit 0
-    done <<<"$members"
-    continue
+    pacman -Q $members &>/dev/null && continue
+    exit 0
   fi
 
   # Neither an installed package nor a known group.
