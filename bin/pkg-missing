@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Like omarchy-pkg-missing, but a name may also be a package group: a group
+# counts as installed only when all of its members are installed.
+# Returns true (exit 0) if any of the named packages/groups are missing.
+
+for pkg in "$@"; do
+  if pacman -Q "$pkg" &>/dev/null; then
+    continue
+  fi
+
+  # Not an installed package; it might be a group.
+  members="$(pacman -Sgq "$pkg" 2>/dev/null)"
+  if [ -n "$members" ]; then
+    while IFS= read -r member; do
+      pacman -Q "$member" &>/dev/null || exit 0
+    done <<<"$members"
+    continue
+  fi
+
+  # Neither an installed package nor a known group.
+  exit 0
+done
+
+exit 1

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Like omarchy-pkg-add, but uses our pkg-missing so package groups are handled
+# (omarchy-pkg-add verifies with `pacman -Q`, which falsely fails on groups).
+# Installs the named packages/groups if any are missing.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if "$SCRIPT_DIR/pkg-missing" "$@"; then
+  sudo pacman -S --noconfirm --needed "$@" || exit 1
+fi
+
+for pkg in "$@"; do
+  # Secondary check to handle states where pacman doesn't register an error.
+  if "$SCRIPT_DIR/pkg-missing" "$pkg"; then
+    echo -e "\033[31mError: Package '$pkg' did not install\033[0m" >&2
+    exit 1
+  fi
+done
+
+exit 0
