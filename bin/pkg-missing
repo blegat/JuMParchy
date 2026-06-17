@@ -1,23 +1,19 @@
 #!/bin/bash
 
-# Like omarchy-pkg-missing, but a name may also be a package group: a group
-# counts as installed only when all of its members are installed.
+# Like omarchy-pkg-missing, but a name may also be a package group.
 # Returns true (exit 0) if any of the named packages/groups are missing.
+#
+# Group membership is checked against the local db (`pacman -Qg`, fast) rather
+# than the sync db (`pacman -Sgq`, ~8x slower). A group therefore counts as
+# installed once it has installed members; a member newly added to the group
+# upstream won't be noticed until the group is queried with a sync.
 
 for pkg in "$@"; do
-  if pacman -Q "$pkg" &>/dev/null; then
-    continue
-  fi
+  # Installed as a package, or an installed package group.
+  pacman -Q "$pkg" &>/dev/null && continue
+  pacman -Qg "$pkg" &>/dev/null && continue
 
-  # Not an installed package; it might be a group. A single `pacman -Q` over all
-  # members succeeds only if every member is installed (one process, not N).
-  members="$(pacman -Sgq "$pkg" 2>/dev/null)"
-  if [ -n "$members" ]; then
-    pacman -Q $members &>/dev/null && continue
-    exit 0
-  fi
-
-  # Neither an installed package nor a known group.
+  # Neither an installed package nor an installed group.
   exit 0
 done
 
