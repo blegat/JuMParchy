@@ -4,6 +4,8 @@ source "$SCRIPT_DIR/lib.sh"
 
 ROOT_SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Useful for compiling from command line
+omarchy-pkg-add rubber
 # See [here](https://github.com/basecamp/omarchy/discussions/1720)
 omarchy-pkg-add zathura zathura-pdf-mupdf
 # texlive is a pkg group so we cannot use omarchy-pkg-add
