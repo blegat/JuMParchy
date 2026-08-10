@@ -26,6 +26,8 @@ fi
 ensure_line "Source profile.sh from ~/.bashrc" \
   "$HOME/.bashrc" "source $ROOT_SRC/profile.sh"
 
+omarchy-pkg-add inkscape
+
 "$SCRIPT_DIR/julia.sh"
 "$SCRIPT_DIR/latex.sh"
 "$SCRIPT_DIR/zotero.sh"
