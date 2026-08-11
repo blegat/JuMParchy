@@ -11,12 +11,7 @@ coi_opencode_profile="$HOME/.coi/profiles/opencode/config.toml"
 if command -v coi >/dev/null 2>&1; then
   ok "code-on-incus"
 else
-  if [ ! -f "$coi_repo/install.sh" ]; then
-    abort "code-on-incus installer not found at $coi_repo/install.sh"
-  fi
-
-  doing "Install code-on-incus"
-  bash "$coi_repo/install.sh"
+  ./install-coi.sh
 fi
 
 if [ -f "$coi_opencode_profile" ]; then
@@ -26,29 +21,6 @@ else
   mkdir -p "$(dirname "$coi_opencode_profile")"
   printf '[tool]\nname = "opencode"\npermission_mode = "bypass"\n' >"$coi_opencode_profile"
 fi
-
-# See https://github.com/mensfeld/code-on-incus/issues/83#issuecomment-4065301139
-ensure_iptables_rule() {
-  local description="$1"
-  local chain="$2"
-  shift 2
-
-  if sudo iptables -C "$chain" "$@"; then
-    ok "$description"
-  else
-    doing "$description"
-    sudo iptables -I "$chain" "$@"
-  fi
-}
-
-ensure_iptables_rule "Allow Incus DHCP" INPUT -i incusbr0 -p udp --dport 67 -j ACCEPT
-ensure_iptables_rule "Allow Incus DNS (UDP)" INPUT -i incusbr0 -p udp --dport 53 -j ACCEPT
-ensure_iptables_rule "Allow Incus DNS (TCP)" INPUT -i incusbr0 -p tcp --dport 53 -j ACCEPT
-ensure_iptables_rule "Allow Incus bridge inbound forwarding" FORWARD -i incusbr0 -j ACCEPT
-ensure_iptables_rule "Allow Incus bridge outbound forwarding" FORWARD -o incusbr0 -j ACCEPT
-
-doing "Build COI image"
-coi build
 
 bindings_file="$HOME/.config/hypr/bindings.conf"
 chatgpt_binding='bindd = SUPER SHIFT, A, ChatGPT, exec, omarchy-launch-webapp "https://chatgpt.com"'
