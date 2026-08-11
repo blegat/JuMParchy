@@ -3,7 +3,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 omarchy-pkg-add podman
 omarchy-pkg-add opencode
-./install-incus.sh
+"$SCRIPT_DIR/install-incus.sh"
 
 coi_repo="$HOME/git/System/code-on-incus"
 coi_opencode_profile="$HOME/.coi/profiles/opencode/config.toml"
@@ -11,7 +11,7 @@ coi_opencode_profile="$HOME/.coi/profiles/opencode/config.toml"
 if command -v coi >/dev/null 2>&1; then
   ok "code-on-incus"
 else
-  ./install-coi.sh
+  "$SCRIPT_DIR/install-coi.sh"
 fi
 
 if [ -f "$coi_opencode_profile" ]; then
