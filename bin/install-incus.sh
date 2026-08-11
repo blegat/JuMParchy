@@ -15,18 +15,3 @@ else
   sudo usermod -aG incus-admin "$USER"
   abort "Log out and back in to apply Incus access, then run ai.sh again"
 fi
-
-if systemctl is-active --quiet incus.service || systemctl is-active --quiet incus.socket; then
-  ok "Incus service"
-else
-  doing "Start Incus service"
-  sudo systemctl enable --now incus.service
-fi
-
-if incus network list --format=csv >/dev/null 2>&1; then
-  ok "Incus initialization"
-else
-  doing "Initialize Incus"
-  sudo incus admin init --auto
-fi
-
