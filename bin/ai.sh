@@ -3,6 +3,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 omarchy-pkg-add podman
 omarchy-pkg-add opencode
+./install-incus.sh
 
 coi_repo="$HOME/git/System/code-on-incus"
 coi_opencode_profile="$HOME/.coi/profiles/opencode/config.toml"
@@ -11,8 +12,7 @@ if command -v coi >/dev/null 2>&1; then
   ok "code-on-incus"
 else
   if [ ! -f "$coi_repo/install.sh" ]; then
-    fail "code-on-incus installer not found at $coi_repo/install.sh"
-    exit 1
+    abort "code-on-incus installer not found at $coi_repo/install.sh"
   fi
 
   doing "Install code-on-incus"
@@ -43,8 +43,7 @@ elif grep -Fxq "$chatgpt_binding" "$bindings_file"; then
   doing "Set Opencode keybinding"
   CHATGPT_BINDING="$chatgpt_binding" OPENCODE_BINDING="$opencode_binding" perl -0pi -e 's/\Q$ENV{CHATGPT_BINDING}\E/$ENV{OPENCODE_BINDING}/' "$bindings_file"
 else
-  fail "Opencode keybinding: expected ChatGPT binding not found in $bindings_file"
-  exit 1
+  abort "Opencode keybinding: expected ChatGPT binding not found in $bindings_file"
 fi
 
 if grep -Fxq "$coi_binding" "$bindings_file"; then
@@ -56,6 +55,5 @@ elif grep -Fxq "$grok_binding" "$bindings_file"; then
   doing "Set COI Opencode keybinding"
   GROK_BINDING="$grok_binding" COI_BINDING="$coi_binding" perl -0pi -e 's/\Q$ENV{GROK_BINDING}\E/$ENV{COI_BINDING}/' "$bindings_file"
 else
-  fail "Opencode keybinding: expected Grok or Opencode binding not found in $bindings_file"
-  exit 1
+  abort "Opencode keybinding: expected Grok or Opencode binding not found in $bindings_file"
 fi

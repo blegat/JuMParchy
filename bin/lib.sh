@@ -2,6 +2,14 @@
 
 set -euo pipefail
 
+abort() {
+  fail "$*"
+  if [[ -t 0 ]]; then
+    read -r -p "Press Enter to close..." </dev/tty || true
+  fi
+  exit 1
+}
+
 ok() {
   printf '\033[1;32m✓\033[0m %s\n' "$*"
 }
