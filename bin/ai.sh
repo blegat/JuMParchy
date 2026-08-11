@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
+
+on_error() {
+  local line="$1"
+  local status="$2"
+  local command="$3"
+
+  abort "ai.sh failed at line $line (exit $status): $command"
+}
+
+trap 'on_error "$LINENO" "$?" "$BASH_COMMAND"' ERR
+
 omarchy-pkg-add podman
 omarchy-pkg-add opencode
 "$SCRIPT_DIR/install-incus.sh"
