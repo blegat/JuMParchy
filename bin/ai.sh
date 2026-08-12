@@ -5,7 +5,6 @@ omarchy-pkg-add podman
 omarchy-pkg-add opencode
 "$SCRIPT_DIR/install-incus.sh"
 
-coi_repo="$HOME/git/System/code-on-incus"
 coi_opencode_profile="$HOME/.coi/profiles/opencode/config.toml"
 
 if command -v coi >/dev/null 2>&1; then

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # install-coi:summary=Install code-on-incus
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+
+coi_repo="$HOME/git/System/code-on-incus"
+
 if [ ! -f "$coi_repo/install.sh" ]; then
   abort "code-on-incus installer not found at $coi_repo/install.sh"
 fi
