@@ -68,6 +68,66 @@ reset_default() {
   fi
 }
 
+# Ask before doing something that cannot be undone. Reads the terminal rather
+# than stdin, so it still works inside a loop being fed by a pipe. When there is
+# no terminal to ask on the answer is no, so unattended runs never delete.
+confirm() {
+  local prompt="$1"
+  local reply
+
+  if [ ! -r /dev/tty ]; then
+    fail "$prompt — no terminal to ask on, assuming no"
+    return 1
+  fi
+
+  printf '\033[1;33m?\033[0m %s [y/N] ' "$prompt" >/dev/tty
+  read -r reply </dev/tty || reply=""
+  [[ ${reply,,} == y || ${reply,,} == yes ]]
+}
+
+# Reverse of link() + reset_default(): drop a symlink this repo installed and,
+# when the repo file declares a [REPLACES_COPY_OF] default, put that default
+# back so the location looks untouched again. Anything that is not a symlink is
+# left alone - it was never ours to remove. A symlink pointing somewhere other
+# than $expected was installed by something else (an older clone, or by hand),
+# so removing it needs confirmation.
+restore_default() {
+  local desc="$1"
+  local file="$2"
+  local expected="$3"
+  local default="${4:-}"
+  local target
+
+  if [ ! -L "$file" ]; then
+    [ -e "$file" ] && ok "$desc: not a symlink, left alone"
+    return 0
+  fi
+
+  target="$(readlink "$file")"
+
+  if [ "$target" != "$expected" ]; then
+    fail "$desc: points at $target"
+    printf '    expected %s\n' "$expected"
+    if ! confirm "Remove $file anyway?"; then
+      ok "$desc: left in place"
+      return 0
+    fi
+  fi
+
+  doing "$desc: was -> $target"
+  rm "$file"
+
+  [ -n "$default" ] || return 0
+
+  if [ ! -e "$default" ]; then
+    fail "$desc: default $default not found, leaving $file absent"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$file")"
+  cp "$default" "$file"
+}
+
 ensure_line() {
   local desc="$1"
   local file="$2"

@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Reset every config to the Omarchy defaults, then reapply JuMParchy on top.
+#
+# Omarchy only ever seeds ~/.config once. Files added to the defaults after
+# that never reach an existing install, so a machine slowly drifts away from
+# upstream. This script resets the whole tree and replays JuMParchy over it,
+# then hands the old tree to merge-configs so nothing local is lost silently.
+#
+# Needs sudo (omarchy-reinstall-configs refreshes limine and plymouth, and
+# setup.sh rebuilds the initramfs when the boot logo changes). Run it from a
+# terminal, not from a hook.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+
+STAMP="$(date +%Y%m%d-%H%M%S)"
+BACKUP="$HOME/.jumparchy-backup.$STAMP"
+
+command -v omarchy-reinstall-configs >/dev/null ||
+  abort "omarchy-reinstall-configs not found; is Omarchy installed?"
+
+cat <<EOF
+This will:
+
+  1. back up ~/.config, ~/.bashrc and ~/.bash_profile to
+     $BACKUP
+  2. run unconfig.sh, restoring the defaults it replaced, and clear any
+     leftover ~/.config symlink into ~/git/System (asking first)
+  3. move ~/.config/nvim into the backup, so omarchy-nvim-setup actually
+     reseeds it instead of no-opping on the existing directory
+  4. run omarchy-reinstall-configs  (resets all configs to defaults, sudo)
+     then redetect the keyboard layout, which that reset drops
+  5. run JuMParchy/bin/setup.sh     (reapplies this repo, sudo)
+  6. run Drive/system/post_install  (if present)
+
+Afterwards you reconcile the backup with:
+
+  $SCRIPT_DIR/merge-configs $BACKUP/config ~/.config
+
+EOF
+
+confirm "Proceed?" || abort "Nothing done."
+
+# 1. Back up everything we are about to disturb. ~/.bashrc matters because
+#    omarchy-reinstall-configs overwrites it with the Omarchy default.
+doing "Backing up to $BACKUP"
+mkdir -p "$BACKUP"
+cp -a "$HOME/.config" "$BACKUP/config"
+[[ -e $HOME/.bashrc ]] && cp -a "$HOME/.bashrc" "$BACKUP/bashrc"
+[[ -e $HOME/.bash_profile ]] && cp -a "$HOME/.bash_profile" "$BACKUP/bash_profile"
+ok "Backed up $(du -sh "$BACKUP" | cut -f1)"
+
+# 2. Undo config.sh, putting the packaged defaults back. This has to happen
+#    before omarchy-reinstall-configs, which copies defaults with `cp -R`:
+#    that writes *through* a symlink and would overwrite this repo's files
+#    with the stock versions. It also clears stale links from an older clone,
+#    which link() would refuse to overwrite when setup.sh runs.
+doing "Running unconfig.sh"
+"$SCRIPT_DIR/unconfig.sh"
+
+# setup.sh links two things that live outside config/ - the screensaver
+# branding and the post-update hook - so unconfig.sh does not know about them.
+doing "Checking for leftover ~/.config symlinks into ~/git/System"
+removed=0
+while IFS= read -r -d '' stale; do
+  case "$(readlink "$stale")" in
+  "$HOME"/git/System/*)
+    fail "leftover: ${stale#"$HOME"/} -> $(readlink "$stale")"
+    if confirm "Remove it? setup.sh aborts on links it did not create itself"; then
+      rm "$stale"
+      removed=$((removed + 1))
+    fi
+    ;;
+  esac
+done < <(find "$HOME/.config" -type l -print0)
+ok "Cleared $removed leftover symlink(s)"
+
+# 3. install_config() in omarchy-nvim-setup returns early whenever
+#    ~/.config/nvim exists, so emptying it is not enough - the directory itself
+#    has to go. ~/.local/share/nvim stays put, so plugins are not re-downloaded.
+if [[ -d $HOME/.config/nvim ]]; then
+  doing "Moving ~/.config/nvim into the backup so it gets reseeded"
+  mv "$HOME/.config/nvim" "$BACKUP/nvim.moved"
+  ok "Moved to $BACKUP/nvim.moved"
+fi
+
+# Prompt for sudo once, up front, rather than midway through.
+doing "Requesting sudo (needed by limine, plymouth and the initramfs rebuild)"
+sudo -v
+
+# 4. Stock defaults for everything Omarchy ships.
+doing "Running omarchy-reinstall-configs"
+omarchy-reinstall-configs
+
+# omarchy-reinstall-configs restores the pristine hypr/input.conf and replays
+# only install/config/theme.sh, so the keyboard layout the installer derived
+# from /etc/vconsole.conf is lost and you end up back on us/qwerty. Replay that
+# step too. The sed in there inserts unconditionally, but input.conf was just
+# reset a moment ago, so it lands exactly once.
+KEYBOARD_DETECT="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/install/config/detect-keyboard-layout.sh"
+if [[ -f $KEYBOARD_DETECT ]]; then
+  doing "Redetecting keyboard layout from /etc/vconsole.conf"
+  bash "$KEYBOARD_DETECT"
+  ok "kb_layout is now: $(grep -E '^[[:space:]]*kb_layout' "$HOME/.config/hypr/input.conf" || echo '(none set)')"
+else
+  fail "Skipping keyboard detection: $KEYBOARD_DETECT not found"
+fi
+
+# 5. JuMParchy back on top.
+doing "Running setup.sh"
+"$SCRIPT_DIR/setup.sh"
+
+cat <<EOF
+
+$(ok "Reinstall complete")
+
+Next:
+
+  1. Reconcile anything local that the reset threw away:
+
+       $SCRIPT_DIR/merge-configs $BACKUP/config ~/.config
+
+     For files this repo manages, prefer adding them under JuMParchy/config
+     and rerunning setup.sh, rather than copying them straight into ~/.config -
+     a plain copy there is drift again by the next reinstall.
+
+  2. Re-enable your LazyVim extras: nvim, then :LazyExtras. The reset restores
+     lazyvim.json to the packaged version.
+
+  3. lazy-lock.json is back at the packaged pins, so plugin versions may move
+     on the next :Lazy sync.
+
+Backup kept at $BACKUP - delete it once you are happy.
+EOF
