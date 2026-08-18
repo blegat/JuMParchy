@@ -17,7 +17,7 @@ if cmp -s "$ROOT_SRC/logo/JuMP_logo.png" /usr/share/plymouth/themes/omarchy/logo
   ok "JuMP logo already applied to Plymouth/SDDM boot"
 else
   doing "Apply JuMP logo to Plymouth/SDDM boot (sudo, rebuilds initramfs)"
-  colors="$HOME/.config/omarchy/current/theme/colors.toml"
+  colors="$HOME/.local/state/omarchy/current/theme/colors.toml"
   bg=$(awk -F'"' '/^background/{print $2}' "$colors")
   fg=$(awk -F'"' '/^foreground/{print $2}' "$colors")
   omarchy-plymouth-set "$bg" "$fg" "$ROOT_SRC/logo/JuMP_logo.png"
