@@ -1,4 +1,8 @@
 return {
+	-- Enable LazyVim's Julia extra (treesitter julia, julials, blink latex
+	-- symbols) from the spec rather than through :LazyExtras, which would
+	-- record it in lazyvim.json - a file Omarchy resets and we do not track.
+	{ import = "lazyvim.plugins.extras.lang.julia" },
 	{
 		"klafyvel/nvim-smuggler",
 		enabled = vim.env.NVIM_NO_SMUGGLER ~= "1",
