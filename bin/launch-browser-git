@@ -1,0 +1,50 @@
+#!/bin/bash
+# Launch the default browser. If the active terminal's cwd is inside a git
+# repository, open the origin remote's web URL instead. Falls back to the plain
+# omarchy-launch-browser behavior otherwise.
+
+cwd=""
+
+terminal_pid=$(hyprctl activewindow | awk '/pid:/ {print $2}')
+shell_pid=$(pgrep -P "$terminal_pid" 2>/dev/null | tail -n1)
+
+if [[ -n $shell_pid ]]; then
+  candidate=$(readlink -f "/proc/$shell_pid/cwd" 2>/dev/null)
+  shell=$(readlink -f "/proc/$shell_pid/exe" 2>/dev/null)
+  if grep -qs "$shell" /etc/shells && [[ -d $candidate ]]; then
+    cwd="$candidate"
+  fi
+fi
+
+url=""
+if [[ -n $cwd ]]; then
+  remote=$(git -C "$cwd" remote get-url origin 2>/dev/null)
+  if [[ -n $remote ]]; then
+    case "$remote" in
+      http://*|https://*)
+        url="${remote%.git}"
+        ;;
+      ssh://*)
+        tmp="${remote#ssh://}"
+        tmp="${tmp#*@}"
+        host="${tmp%%/*}"
+        path="${tmp#*/}"
+        path="${path%.git}"
+        url="https://${host}/${path}"
+        ;;
+      *@*:*)
+        tmp="${remote#*@}"
+        host="${tmp%%:*}"
+        path="${tmp#*:}"
+        path="${path%.git}"
+        url="https://${host}/${path}"
+        ;;
+    esac
+  fi
+fi
+
+if [[ -n $url ]]; then
+  exec omarchy-launch-browser --new-window "$url"
+else
+  exec omarchy-launch-browser "$@"
+fi

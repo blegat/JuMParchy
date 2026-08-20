@@ -28,6 +28,7 @@ ensure_line "Source profile.sh from ~/.bashrc" \
 
 omarchy-pkg-add inkscape
 
+"$SCRIPT_DIR/git.sh"
 "$SCRIPT_DIR/julia.sh"
 "$SCRIPT_DIR/latex.sh"
 "$SCRIPT_DIR/zotero.sh"
