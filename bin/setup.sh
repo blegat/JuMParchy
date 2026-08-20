@@ -3,9 +3,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-link "Register custom.sh as omarchy post-update hook" \
-  "$SCRIPT_DIR/custom.sh" "$HOME/.config/omarchy/hooks/post-update.d"
-
 reset_default "Clear default omarchy screensaver branding" \
   "$HOME/.config/omarchy/branding/screensaver.txt" \
   "$HOME/.local/share/omarchy/logo.txt"
