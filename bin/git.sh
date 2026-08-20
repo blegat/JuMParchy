@@ -2,6 +2,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
+# Otherwise it does not even let me try `git pull` if it's not clean and I need to constantly stash
+# even if the `git pull` where probably just going to tell me I am up to date
+git config --global --unset pull.rebase
+git config --global pull.ff only
+
 link "Launch browser with git remote" "$SCRIPT_DIR/launch-browser-git" "$HOME/.local/bin/launch-browser-git"
 
 # Point SUPER SHIFT RETURN at launch-browser-git. Matching the whole line keeps
