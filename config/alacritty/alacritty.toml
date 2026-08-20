@@ -10,3 +10,6 @@ bindings = [
   { key = "Return", mods = "Control",       chars = "\u001b[13;5u" },
   { key = "Return", mods = "Control|Shift", chars = "\u001b[13;6u" },
 ]
+
+# Send Shift+Return as CSI-u so TUIs can distinguish it from Return without treating it as Alt+Return.
+{ key = "Return", mods = "Shift", chars = "\u001B[13;2u" }
