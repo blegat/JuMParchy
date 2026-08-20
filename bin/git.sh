@@ -4,7 +4,7 @@ source "$SCRIPT_DIR/lib.sh"
 
 # Otherwise it does not even let me try `git pull` if it's not clean and I need to constantly stash
 # even if the `git pull` where probably just going to tell me I am up to date
-git config --global --unset pull.rebase
+git config --global --unset-all pull.rebase || [ "$?" -eq 5 ]
 git config --global pull.ff only
 
 link "Launch browser with git remote" "$SCRIPT_DIR/launch-browser-git" "$HOME/.local/bin/launch-browser-git"
