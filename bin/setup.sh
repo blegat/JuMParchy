@@ -32,5 +32,4 @@ omarchy-pkg-add inkscape
 "$SCRIPT_DIR/julia.sh"
 "$SCRIPT_DIR/latex.sh"
 "$SCRIPT_DIR/zotero.sh"
-"$SCRIPT_DIR/ai.sh"
 "$SCRIPT_DIR/config.sh"
