@@ -2,21 +2,23 @@
 # Walk two config trees side by side and interactively carry changes from the
 # old tree (SRC) into the new one (DST).
 #
-#   merge-configs ~/.config_backup.20260815-1200 ~/.config
+#   merge-configs ~/.jumparchy-backup.20260815-184706/config ~/.config
 #
 # Only SRC drives the walk: anything that exists solely in DST is new material
-# from the reinstall and is left alone. For every entry found in SRC:
+# from the reinstall and is left alone. Entries that match are never mentioned,
+# so what you see is only what still needs a decision.
 #
-#   missing in DST      ask, then copy it across (whole subtree for a directory)
-#   both directories    recurse
-#   identical files     ignore silently
-#   differing files     show the diff, ask, then copy SRC's version over DST's
+#   directory with differences  enter it, or ignore the whole subtree
+#   directory missing in DST    copy the whole thing across, or not
+#   file missing in DST         copy it across, or not
+#   file that differs           show the diff, then apply it or not
+#
+# q stops the directory you are in and returns to its parent; at the top level
+# it ends the run. Everything declined is listed again at the end.
 #
 # Symlinks are compared as symlinks and never followed, so a file that moved
 # between repo clones shows up as a difference in the link target. Decline
 # those; they are reported again in the closing summary.
-#
-# Everything declined is listed again at the end, so nothing is silently lost.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
@@ -60,35 +62,6 @@ summary() {
   fi
 }
 
-# Ask a yes/no question on the terminal. 'd' redisplays the full diff when one
-# is on offer, 'q' stops the walk and jumps straight to the summary.
-ask() {
-  local prompt="$1" diff_src="${2:-}" diff_dst="${3:-}" reply
-  local hint="[y/N/q]"
-  [[ -n $diff_src ]] && hint="[y/N/d=full diff/q]"
-
-  while true; do
-    printf '\033[1;33m?\033[0m %s %s ' "$prompt" "$hint" >/dev/tty
-    read -r reply </dev/tty || reply="q"
-    case "${reply,,}" in
-      y | yes) return 0 ;;
-      "" | n | no) return 1 ;;
-      d | diff)
-        if [[ -n $diff_src ]]; then
-          echo >/dev/tty
-          diff -u "$diff_dst" "$diff_src" >/dev/tty 2>&1 || true
-          echo >/dev/tty
-        fi
-        ;;
-      q | quit)
-        echo >/dev/tty
-        summary
-        exit 0
-        ;;
-    esac
-  done
-}
-
 exists() {
   [[ -e $1 || -L $1 ]]
 }
@@ -112,6 +85,68 @@ same() {
   cmp -s "$a" "$b"
 }
 
+# How many decisions are waiting inside a pair of directories. diff does the
+# recursion in C, which matters: 840MB of Firefox profile answers in about a
+# second, where walking it in bash would not. Entries that exist only on the
+# destination side are new material from the reinstall, so they do not count.
+pending_count() {
+  local sp="$1" dp="$2"
+  { diff -rq --no-dereference "$sp" "$dp" 2>/dev/null || true; } |
+    awk -v d="Only in $dp" 'index($0, d) != 1' | wc -l
+}
+
+# 0 = yes, 1 = no, 2 = leave this directory. Reads the terminal rather than
+# stdin, so it works inside a loop whose stdin is a pipe.
+ask() {
+  local prompt="$1" diff_src="${2:-}" diff_dst="${3:-}" reply
+  local hint="[y/N/q]"
+  [[ -n $diff_src ]] && hint="[y/N/d=full diff/q]"
+
+  while true; do
+    printf '\033[1;33m?\033[0m %s %s ' "$prompt" "$hint" >/dev/tty
+    read -r reply </dev/tty || reply="q"
+    case "${reply,,}" in
+    y | yes) return 0 ;;
+    "" | n | no) return 1 ;;
+    d | diff)
+      if [[ -n $diff_src ]]; then
+        echo >/dev/tty
+        diff -u "$diff_dst" "$diff_src" >/dev/tty 2>&1 || true
+        echo >/dev/tty
+      fi
+      ;;
+    q | quit) return 2 ;;
+    esac
+  done
+}
+
+# 0 = enter, 1 = ignore the whole subtree, 2 = leave this directory.
+ask_dir() {
+  local prompt="$1" reply
+
+  while true; do
+    printf '\033[1;33m?\033[0m %s [e=enter/i=ignore/q] ' "$prompt" >/dev/tty
+    read -r reply </dev/tty || reply="q"
+    case "${reply,,}" in
+    e | enter) return 0 ;;
+    "" | i | ignore) return 1 ;;
+    q | quit) return 2 ;;
+    esac
+  done
+}
+
+header() {
+  echo
+  printf '\033[1m── %s\033[0m %s\n' "$1" "${2:-}"
+}
+
+# Where a change would come from and land. Without this the prompts show a bare
+# relative name, which tells you nothing about which tree is which.
+show_paths() {
+  printf '   from %s\n' "$1"
+  printf '   to   %s\n' "$2"
+}
+
 describe_link() {
   if [[ -L $1 ]]; then
     printf 'symlink -> %s' "$(readlink "$1")"
@@ -121,10 +156,7 @@ describe_link() {
 }
 
 show_diff() {
-  local sp="$1" dp="$2" rel="$3" out lines
-
-  echo
-  printf '\033[1m── %s\033[0m\n' "$rel"
+  local sp="$1" dp="$2" out lines
 
   if [[ -L $sp || -L $dp ]]; then
     printf '   backup:  %s\n' "$(describe_link "$sp")"
@@ -159,81 +191,169 @@ copy_over() {
   cp -a --remove-destination "$sp" "$dp"
 }
 
-walk() {
-  local rel="$1" entry name srel sp dp
+# Collect the entries of one directory that still need a decision, so the
+# [n/total] counter reflects work left rather than directory size. Pending
+# counts for subdirectories are cached here and reused when prompting.
+declare -A DIR_PENDING=()
+
+actionable() {
+  local rel="$1" entry name sp dp
+  ACTIONABLE=()
 
   for entry in "$SRC${rel:+/$rel}"/*; do
     name="$(basename "$entry")"
-    srel="${rel:+$rel/}$name"
-    sp="$SRC/$srel"
-    dp="$DST/$srel"
+    sp="$SRC/${rel:+$rel/}$name"
+    dp="$DST/${rel:+$rel/}$name"
 
     if [[ -d $sp && ! -L $sp ]]; then
       if ! exists "$dp"; then
-        if ask "Directory only in backup: $srel/ — copy it across?"; then
-          copy_over "$sp" "$dp"
-          ok "copied $srel/"
-          APPLIED+=("$srel/")
-        else
-          SKIPPED+=("$srel/  (whole directory)")
-        fi
+        ACTIONABLE+=("$name")
       elif [[ -d $dp && ! -L $dp ]]; then
-        walk "$srel"
+        DIR_PENDING["$sp"]="$(pending_count "$sp" "$dp")"
+        ((DIR_PENDING["$sp"] > 0)) && ACTIONABLE+=("$name")
       else
-        fail "$srel is a directory in the backup but not in the destination — skipping"
-        SKIPPED+=("$srel  (type mismatch: directory vs file)")
+        ACTIONABLE+=("$name")
       fi
       continue
     fi
 
     if ! exists "$dp"; then
-      if ask "File only in backup: $srel — copy it across?"; then
-        copy_over "$sp" "$dp"
-        ok "copied $srel"
-        APPLIED+=("$srel")
-      else
-        SKIPPED+=("$srel  (missing from destination)")
-      fi
-      continue
-    fi
-
-    if [[ -d $dp && ! -L $dp ]]; then
-      fail "$srel is a file in the backup but a directory in the destination — skipping"
-      SKIPPED+=("$srel  (type mismatch: file vs directory)")
-      continue
-    fi
-
-    same "$sp" "$dp" && continue
-
-    local reason="contents differ"
-    if [[ -L $sp || -L $dp ]]; then
-      if diff -q "$dp" "$sp" >/dev/null 2>&1; then
-        reason="link differs, contents identical"
-      else
-        reason="link and contents differ"
-      fi
-    fi
-
-    show_diff "$sp" "$dp" "$srel"
-
-    if [[ -L $dp ]]; then
-      printf '   \033[1;31m!\033[0m destination is a symlink into %s\n' \
-        "$(dirname "$(readlink -f "$dp")")"
-      printf '     Applying replaces the link with a plain file and drops it out\n'
-      printf '     of config.sh management. Usually you want to edit the repo instead.\n'
-    fi
-
-    if ask "Apply the backup version of $srel?" "$sp" "$dp"; then
-      copy_over "$sp" "$dp"
-      ok "applied $srel"
-      APPLIED+=("$srel")
-    else
-      SKIPPED+=("$srel  ($reason)")
+      ACTIONABLE+=("$name")
+    elif [[ -d $dp && ! -L $dp ]]; then
+      ACTIONABLE+=("$name")
+    elif ! same "$sp" "$dp"; then
+      ACTIONABLE+=("$name")
     fi
   done
 }
 
+# Returns 0 when the parent should carry on. q is handled here: at the top
+# level it ends the run, deeper it just unwinds one directory.
+walk() {
+  local rel="$1" depth="$2"
+  local -a items=()
+  local name srel sp dp pos total idx rc reason pending
+
+  actionable "$rel"
+  items=("${ACTIONABLE[@]}")
+  total=${#items[@]}
+  idx=0
+
+  for name in "${items[@]}"; do
+    idx=$((idx + 1))
+    srel="${rel:+$rel/}$name"
+    sp="$SRC/$srel"
+    dp="$DST/$srel"
+    pos="[$idx/$total]"
+
+    if [[ -d $sp && ! -L $sp ]]; then
+      if ! exists "$dp"; then
+        header "$pos $srel/" "(directory, only in the backup)"
+        show_paths "$sp" "$dp"
+        reason="whole directory, not copied"
+        rc=0
+        ask "Copy the whole directory across?" || rc=$?
+      elif [[ -d $dp && ! -L $dp ]]; then
+        pending="${DIR_PENDING["$sp"]:-0}"
+        header "$pos $srel/" "($pending pending)"
+        rc=0
+        ask_dir "Enter it, or ignore the whole subtree?" || rc=$?
+        case $rc in
+        0)
+          walk "$srel" $((depth + 1))
+          continue
+          ;;
+        1)
+          SKIPPED+=("$srel/  ($pending pending, subtree ignored)")
+          continue
+          ;;
+        esac
+      else
+        fail "$srel is a directory in the backup but not in the destination"
+        SKIPPED+=("$srel  (type mismatch)")
+        continue
+      fi
+    elif ! exists "$dp"; then
+      header "$pos $srel" "(only in the backup)"
+      show_paths "$sp" "$dp"
+      reason="missing from destination"
+      rc=0
+      ask "Copy it across?" || rc=$?
+    elif [[ -d $dp && ! -L $dp ]]; then
+      fail "$srel is a file in the backup but a directory in the destination"
+      SKIPPED+=("$srel  (type mismatch)")
+      continue
+    else
+      reason="contents differ"
+      if [[ -L $sp || -L $dp ]]; then
+        if diff -q "$dp" "$sp" >/dev/null 2>&1; then
+          reason="link differs, contents identical"
+        else
+          reason="link and contents differ"
+        fi
+      fi
+
+      header "$pos $srel"
+      show_paths "$sp" "$dp"
+      show_diff "$sp" "$dp"
+
+      if [[ -L $dp ]]; then
+        printf '   \033[1;31m!\033[0m destination is a symlink into %s\n' \
+          "$(dirname "$(readlink -f "$dp")")"
+        printf '     Applying replaces the link with a plain file and drops it out\n'
+        printf '     of config.sh management. Usually you want to edit the repo instead.\n'
+      fi
+
+      rc=0
+      ask "Apply the backup version?" "$sp" "$dp" || rc=$?
+    fi
+
+    case $rc in
+    0)
+      copy_over "$sp" "$dp"
+      ok "applied $srel"
+      APPLIED+=("$srel")
+      ;;
+    1)
+      SKIPPED+=("$srel  ($reason)")
+      ;;
+    2)
+      if ((depth == 0)); then
+        summary
+        exit 0
+      fi
+      SKIPPED+=("$rel/  (left after $((idx - 1))/$total, $((total - idx + 1)) not reviewed)")
+      return 0
+      ;;
+    esac
+    reason=""
+  done
+}
+
 printf 'Comparing\n  backup:  %s\n  current: %s\n' "$SRC" "$DST"
-echo
-walk ""
+
+# Catch being handed a backup root rather than the config tree inside it.
+# reinstall-configs stores config/, nvim.moved/ and the bash files side by side,
+# so merging that root into ~/.config would nest a whole config/ tree in it.
+top_total=0
+top_shared=0
+for entry in "$SRC"/*; do
+  top_total=$((top_total + 1))
+  exists "$DST/$(basename "$entry")" && top_shared=$((top_shared + 1))
+done
+
+if ((top_total > 0 && top_shared == 0)); then
+  echo
+  fail "None of the $top_total top-level entries in the backup exist in the destination"
+  if [[ -d $SRC/config ]]; then
+    printf '    That looks like a backup root, not a config tree. Did you mean:\n'
+    printf '      %s %s %s\n' "$0" "$SRC/config" "$DST"
+  fi
+  confirm "Compare these two directories anyway?" || abort "Nothing done."
+fi
+
+doing "Counting differences"
+printf '   %s decisions pending in total\n' "$(pending_count "$SRC" "$DST")"
+
+walk "" 0
 summary
