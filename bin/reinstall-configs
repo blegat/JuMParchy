@@ -92,20 +92,6 @@ sudo -v
 doing "Running omarchy-reinstall-configs"
 omarchy-reinstall-configs
 
-# omarchy-reinstall-configs restores the pristine hypr/input.conf and replays
-# only install/config/theme.sh, so the keyboard layout the installer derived
-# from /etc/vconsole.conf is lost and you end up back on us/qwerty. Replay that
-# step too. The sed in there inserts unconditionally, but input.conf was just
-# reset a moment ago, so it lands exactly once.
-KEYBOARD_DETECT="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/install/config/detect-keyboard-layout.sh"
-if [[ -f $KEYBOARD_DETECT ]]; then
-  doing "Redetecting keyboard layout from /etc/vconsole.conf"
-  bash "$KEYBOARD_DETECT"
-  ok "kb_layout is now: $(grep -E '^[[:space:]]*kb_layout' "$HOME/.config/hypr/input.conf" || echo '(none set)')"
-else
-  fail "Skipping keyboard detection: $KEYBOARD_DETECT not found"
-fi
-
 # 5. JuMParchy back on top.
 doing "Running setup.sh"
 "$SCRIPT_DIR/setup.sh"
