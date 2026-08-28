@@ -4,7 +4,7 @@ JuMParchy is an opinionated [JuMP](https://jump.dev/)-flavor derivative of [omar
 
 What does it do ?
 
-- ✓ Replace the omarchy logo by the JuMP logo
+- ✓ Replace the Omarchy screensaver logo with the JuMP logo
 - ✓ Configure NeoVim for Julia in a way that's familiar to the Julia VS code extension
 - ✓ Configure NeoVim for LaTeX
 - ✓ Install Zotero

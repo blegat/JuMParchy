@@ -6,9 +6,8 @@
 # upstream. This script resets the whole tree and replays JuMParchy over it,
 # then hands the old tree to merge-configs so nothing local is lost silently.
 #
-# Needs sudo (omarchy-reinstall-configs refreshes limine and plymouth, and
-# setup.sh rebuilds the initramfs when the boot logo changes). Run it from a
-# terminal, not from a hook.
+# Needs sudo because omarchy-reinstall-configs refreshes limine and plymouth.
+# Run it from a terminal, not from a hook.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
@@ -30,7 +29,7 @@ This will:
      reseeds it instead of no-opping on the existing directory
   4. run omarchy-reinstall-configs  (resets all configs to defaults, sudo)
      then redetect the keyboard layout, which that reset drops
-  5. run JuMParchy/bin/setup.sh     (reapplies this repo, sudo)
+  5. run JuMParchy/bin/setup.sh     (reapplies this repo)
   6. run Drive/system/post_install  (if present)
 
 Afterwards you reconcile the backup with:
