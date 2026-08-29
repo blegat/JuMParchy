@@ -141,3 +141,29 @@ ensure_line() {
   doing "$desc"
   echo "$line" >>"$file"
 }
+
+ensure_keybinding() {
+  local desc="$1"
+  local chord="$2"
+  local bind_line="$3"
+  local bindings="$HOME/.config/hypr/bindings.lua"
+  local unbind_line="hl.unbind(\"$chord\")"
+  local config_errors
+
+  if [ -f "$bindings" ] && grep -Fxq "$unbind_line" "$bindings" && grep -Fxq "$bind_line" "$bindings"; then
+    ok "$desc"
+    return 0
+  fi
+
+  doing "$desc"
+  cp "$bindings" "$bindings.bak.$(date +%s%N)"
+  printf '\n%s\n%s\n' "$unbind_line" "$bind_line" >>"$bindings"
+
+  hyprctl reload >/dev/null
+  config_errors=$(hyprctl configerrors)
+  if [[ -n $config_errors ]]; then
+    fail "Hyprland configuration errors:"
+    printf '%s\n' "$config_errors" >&2
+    exit 1
+  fi
+}
