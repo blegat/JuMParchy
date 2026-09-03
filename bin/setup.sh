@@ -14,6 +14,7 @@ ensure_line "Source profile.sh from ~/.bashrc" \
   "$HOME/.bashrc" "source $ROOT_SRC/profile.sh"
 
 omarchy-pkg-add inkscape
+omarchy-pkg-add vlc vlc-plugin-ffmpeg
 
 "$SCRIPT_DIR/git.sh"
 "$SCRIPT_DIR/julia.sh"
