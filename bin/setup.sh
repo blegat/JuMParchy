@@ -17,6 +17,7 @@ omarchy-pkg-add inkscape
 omarchy-pkg-add vlc vlc-plugin-ffmpeg
 
 "$SCRIPT_DIR/git.sh"
+"$SCRIPT_DIR/worktrunk.sh"
 "$SCRIPT_DIR/julia.sh"
 "$SCRIPT_DIR/latex.sh"
 "$SCRIPT_DIR/zotero.sh"

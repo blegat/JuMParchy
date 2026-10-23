@@ -1,0 +1,2 @@
+[aliases]
+sw = "wt switch {{ args }}"
