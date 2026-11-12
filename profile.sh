@@ -3,13 +3,13 @@ alias gp='git push'
 # We only install nvim and not vim so let's make vim shortcut to nvim
 alias vim='nvim'
 
-# Print resume commands for Claude and Codex histories containing a literal string.
+# Rank resume commands by literal occurrence count across Claude and Codex histories.
 which_agent() {
     if [ "$#" -ne 1 ]; then
         echo 'Usage: which_agent STRING' >&2
         return 2
     fi
-    local directory matches file session_id
+    local directory matches file session_id count
     local -a histories=()
     for directory in "$HOME/.claude/projects" "$HOME/.codex/sessions" "$HOME/.codex/archived_sessions"; do
         if [ -d "$directory" ]; then
@@ -21,18 +21,22 @@ which_agent() {
     fi
     matches=$(grep -rlF --include='*.jsonl' -- "$1" "${histories[@]}") || return $?
     while IFS= read -r file; do
+        count=$(grep -oF -- "$1" "$file" | wc -l)
         case "$file" in
             "$HOME/.codex/"*)
                 # Subagents have their own id; session_id identifies the main session.
                 session_id=$(head -n 1 "$file" | jq -er '.payload | .session_id // .parent_thread_id // .id') || return $?
-                printf 'codex resume %q\n' "$session_id"
+                printf '%s\tcodex resume %q\n' "$count" "$session_id"
                 ;;
             *)
                 session_id=${file##*/}
-                printf 'claude --resume %q\n' "${session_id%.jsonl}"
+                printf '%s\tclaude --resume %q\n' "$count" "${session_id%.jsonl}"
                 ;;
         esac
-    done <<< "$matches" | sort -u
+    done <<< "$matches" | awk -F '\t' '
+        { counts[$2] += $1 }
+        END { for (command in counts) printf "%d\t%s\n", counts[command], command }
+    ' | sort -k1,1nr -k2
 }
 
 ## Julia shortcuts
