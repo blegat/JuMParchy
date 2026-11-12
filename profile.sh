@@ -21,6 +21,8 @@ alias jformat="julia -e 'using JuliaFormatter; format(\"src\"); format(\"test\")
 alias jformatall="julia -e 'using JuliaFormatter; format(\".\", verbose=true)'"
 alias pluto="julia -e 'import Pluto; Pluto.run()'"
 
+export PATH=/home/blegat/.julia/bin${PATH:+:${PATH}}
+
 # Julia REPL for Vim
 jv() {
     julia "$@" -i -e 'using Revise; using REPLSmuggler; smuggle()'
