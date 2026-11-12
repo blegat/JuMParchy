@@ -3,6 +3,25 @@ alias gp='git push'
 # We only install nvim and not vim so let's make vim shortcut to nvim
 alias vim='nvim'
 
+# Print Claude and Codex session files containing a literal string.
+which_agent() {
+    if [ "$#" -ne 1 ]; then
+        echo 'Usage: which_agent STRING' >&2
+        return 2
+    fi
+    local directory
+    local -a histories=()
+    for directory in "$HOME/.claude/projects" "$HOME/.codex/sessions" "$HOME/.codex/archived_sessions"; do
+        if [ -d "$directory" ]; then
+            histories+=("$directory")
+        fi
+    done
+    if [ "${#histories[@]}" -eq 0 ]; then
+        return 1
+    fi
+    grep -rlF --include='*.jsonl' -- "$1" "${histories[@]}"
+}
+
 ## Julia shortcuts
 
 jp() {
