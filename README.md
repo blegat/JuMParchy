@@ -37,12 +37,8 @@ rsync -rlpc --backup --backup-dir="$backup/config" /etc/skel/.config/ "$HOME/.co
 `rsync` saves the entries it replaces under `$backup/config` and keeps files that exist only in `~/.config`.
 Once the copy succeeds, `setup.sh` restores JuMParchy’s symlinks and settings.
 
-## How does it work ?
+## How does it work?
 
-At install, Omarchy clones [itself](https://github.com/basecamp/omarchy) at `~/.local/share/omarchy`. Then it [copies `~/.local/share/omarchy/config`](https://github.com/basecamp/omarchy/blob/8075b8b0dcd870ae3853bee99259bb41e8759c3f/install/config/config.sh#L2-L3) into `~/.config`.
-At each updates, it does [`git pull` on `~/.local/share/omarchy`](https://github.com/basecamp/omarchy/blob/8075b8b0dcd870ae3853bee99259bb41e8759c3f/bin/omarchy-update-git#L15).
-Then, it has migration scripts for the files in `~/.config` that were modified, it does not re-copy its `config` folder into `~/.config` to avoid overwriting user modifications.
+Omarchy 4.5 ships its commands and shared defaults under `/usr/share/omarchy`. Its packages also install config files in `/etc/skel/.config`, which seed `~/.config` when a user account is created. On an existing installation, `omarchy update` upgrades the packages and runs pending migrations. A migration can update individual user configs. To refresh the whole set of shipped config files, follow [Updates](#updates).
 
-Our script create symlinks in `~/.config` so they shouldn't be overwritten by omarchy updates.
-Running `bin/setup.sh` also adds a post-update hook to omarchy that
-run `git pull` and then `bash bin/setup.sh` after each omarchy update.
+JuMParchy’s `bin/setup.sh` calls `bin/config.sh` to symlink each file in this repo’s `config/` directory into the corresponding path under `~/.config`. For example, `~/.config/alacritty/alacritty.toml` points to the copy in your JuMParchy checkout, so edits there take effect through the link. Setup also links the JuMP screensaver logo, adds the shell profile to `~/.bashrc`, and applies the app-specific settings.
