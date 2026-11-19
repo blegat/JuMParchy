@@ -23,6 +23,20 @@ $ bash bin/setup.sh
 The script is *idempotent* which means that running it again should just leave your system unchanged.
 This allows making changes to the script and re-running it to update the system while making the part that weren't changed unaffected.
 
+## Updates
+
+After upgrading to Omarchy 4.5, you can refresh `~/.config` from the packaged defaults in `/etc/skel/.config` and reapply JuMParchy.
+If you keep all your customizations in JuMParchy, close Chromium (the defaults include its preferences), then run the following from the JuMParchy folder as your normal user.
+
+```sh
+backup="$HOME/.jumparchy-backup.$(date +%Y%m%d-%H%M%S)"
+rsync -rlpc --backup --backup-dir="$backup/config" /etc/skel/.config/ "$HOME/.config/" &&
+  ./bin/setup.sh
+```
+
+`rsync` saves the entries it replaces under `$backup/config` and keeps files that exist only in `~/.config`.
+Once the copy succeeds, `setup.sh` restores JuMParchy’s symlinks and settings.
+
 ## How does it work ?
 
 At install, Omarchy clones [itself](https://github.com/basecamp/omarchy) at `~/.local/share/omarchy`. Then it [copies `~/.local/share/omarchy/config`](https://github.com/basecamp/omarchy/blob/8075b8b0dcd870ae3853bee99259bb41e8759c3f/install/config/config.sh#L2-L3) into `~/.config`.
