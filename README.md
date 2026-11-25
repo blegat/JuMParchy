@@ -8,6 +8,7 @@ What does it do ?
 - ✓ Configure NeoVim for Julia in a way that's familiar to the Julia VS code extension
 - ✓ Configure NeoVim for LaTeX
 - ✓ Install Zotero
+- ✓ Keep the laptop’s occupied workspace numbers when closing the lid with one external display
 
 What does it not do ?
 
@@ -42,3 +43,24 @@ rsync -rlpc --backup --backup-dir="$backup/config" /etc/skel/.config/ "$HOME/.co
 
 `rsync` saves the entries it replaces under `$backup/config` and keeps files that exist only in `~/.config`.
 Once the copy succeeds, `setup.sh` restores JuMParchy’s symlinks and settings.
+
+## How does it work ?
+
+At install, Omarchy clones [itself](https://github.com/basecamp/omarchy) at `~/.local/share/omarchy`. Then it [copies `~/.local/share/omarchy/config`](https://github.com/basecamp/omarchy/blob/8075b8b0dcd870ae3853bee99259bb41e8759c3f/install/config/config.sh#L2-L3) into `~/.config`.
+At each updates, it does [`git pull` on `~/.local/share/omarchy`](https://github.com/basecamp/omarchy/blob/8075b8b0dcd870ae3853bee99259bb41e8759c3f/bin/omarchy-update-git#L15).
+Then, it has migration scripts for the files in `~/.config` that were modified, it does not re-copy its `config` folder into `~/.config` to avoid overwriting user modifications.
+
+Our script create symlinks in `~/.config` so they shouldn't be overwritten by omarchy updates.
+Running `bin/setup.sh` also adds a post-update hook to omarchy that
+run `git pull` and then `bash bin/setup.sh` after each omarchy update.
+
+## Clamshell workspaces
+
+With one external display, closing the lid gives the laptop’s occupied workspaces
+their usual numbers on that display. JuMParchy moves conflicting external
+workspaces to higher slots or to the bar’s guest section if those slots are
+full. Reopening the lid returns the workspaces to their original displays and slots.
+
+`bin/config.sh` builds the Hyprland override from the installed Omarchy module.
+If an Omarchy update changes the code the patch depends on, JuMParchy reports the
+mismatch and Hyprland uses Omarchy’s workspace behavior.

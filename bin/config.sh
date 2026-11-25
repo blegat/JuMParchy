@@ -19,3 +19,5 @@ while IFS= read -r -d '' src; do
 
   link "config/$rel" "$src" "$dst"
 done < <(find "$CONFIG_SRC" -type f -print0)
+
+bash "$SCRIPT_DIR/clamshell-workspaces.sh"

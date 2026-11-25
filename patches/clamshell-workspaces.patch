@@ -1,0 +1,214 @@
+--- monitor-workspaces.lua
++++ monitor-workspaces.lua
+@@ -29,6 +29,7 @@
+ local STATE_DIR = paths.state_home .. "/omarchy"
+ local STATE_FILE = STATE_DIR .. "/monitor-workspaces"
+ local MERGED_FILE = STATE_DIR .. "/monitor-workspaces-merged"
++local LAPTOP_FILE = STATE_DIR .. "/monitor-workspaces-laptop"
+
+ local M = { slots = SLOTS }
+
+@@ -72,9 +73,10 @@
+   end
+
+   for line in file:lines() do
+-    local id, original, identity = line:match("^(%d+)\t(%d+)\t(.+)$")
++    local id, original, identity = line:match("^(%d+)\t(%-?%d+)\t(.+)$")
+     if id then
+-      merged[tonumber(id)] = { id = tonumber(original), identity = identity }
++      local origin = tonumber(original)
++      merged[tonumber(id)] = { id = math.abs(origin), identity = identity, displaced = origin < 0 }
+     end
+   end
+
+@@ -92,7 +94,9 @@
+
+   local lines = {}
+   for _, id in ipairs(ids) do
+-    lines[#lines + 1] = id .. "\t" .. merged[id].id .. "\t" .. merged[id].identity .. "\n"
++    local origin = merged[id]
++    local original = origin.displaced and -origin.id or origin.id
++    lines[#lines + 1] = id .. "\t" .. original .. "\t" .. origin.identity .. "\n"
+   end
+
+   local file = io.open(MERGED_FILE, "w")
+@@ -521,6 +525,92 @@
+   end, "o.workspaces.move_window_to_monitor(" .. literal(direction) .. ")")
+ end
+
++-- Omarchy disables the internal output with this flag when docked. Limit the
++-- borrowed numbering to one external display, where the destination is clear.
++local function clamshell_blocks(monitors)
++  local external = monitors[1]
++  if #monitors ~= 1 or internal(external) or external.name == "FALLBACK" then
++    return
++  end
++
++  local flag = io.open(paths.home .. "/.local/state/omarchy/toggles/hypr/internal-monitor-clamshell.lua", "r")
++  if not flag then
++    return
++  end
++  flag:close()
++
++  local file = io.open(LAPTOP_FILE, "r")
++  if file then
++    local identity = file:read("*l")
++    file:close()
++    if identity and blocks[identity] ~= nil then
++      return identity, external
++    end
++  end
++end
++
++local function overflow_slot()
++  local block = 0
++  for _, assigned in pairs(blocks) do
++    block = math.max(block, assigned + 1)
++  end
++  local id = block * SLOTS + 1
++  while hl.get_workspace(id) do
++    id = id + 1
++  end
++  return id
++end
++
++local function preserve_laptop_slots(laptop, external, by_connector, identities)
++  local block = by_connector[external.name]
++  local laptop_block = blocks[laptop]
++  local wanted = {}
++  for _, workspace in ipairs(hl.get_workspaces()) do
++    if regular(workspace) and workspace.monitor and workspace.monitor.name == external.name and workspace.windows > 0 then
++      local origin = merged[workspace.id]
++      if (origin and origin.identity == laptop) or (not origin and block_of_id(workspace.id) == laptop_block) then
++        local original_id = origin and origin.id or workspace.id
++        wanted[block * SLOTS + (original_id - 1) % SLOTS + 1] = workspace
++      end
++    end
++  end
++
++  local changed = false
++  for slot = 1, SLOTS do
++    local id = block * SLOTS + slot
++    local workspace = wanted[id]
++    local occupant = workspace and hl.get_workspace(id)
++    if occupant and workspace.id ~= id then
++      local next_id = id + 1
++      while next_id <= (block + 1) * SLOTS and (wanted[next_id] or hl.get_workspace(next_id)) do
++        next_id = next_id + 1
++      end
++      if next_id > (block + 1) * SLOTS then
++        -- Keep the overflow workspace reachable in the bar's guest section.
++        next_id = overflow_slot()
++      end
++      if not merged[id] then
++        merged[id] = { id = id, identity = identities[external.name], displaced = true }
++      end
++      renumber(occupant, next_id)
++      changed = true
++    end
++  end
++
++  for slot = 1, SLOTS do
++    local id = block * SLOTS + slot
++    local workspace = wanted[id]
++    if workspace and workspace.id ~= id then
++      if not merged[workspace.id] then
++        merged[workspace.id] = { id = workspace.id, identity = laptop }
++      end
++      renumber(workspace, id)
++      changed = true
++    end
++  end
++  return changed
++end
++
+ -- Put every workspace whose monitor is plugged in back on it, and every monitor
+ -- on a workspace of its own. `added` names a monitor that just arrived, which
+ -- leaves whatever Hyprland put it on; `gone` one being removed.
+@@ -531,6 +621,20 @@
+   end
+
+   local by_connector, identities = assign(monitors)
++  local laptop, external = clamshell_blocks(monitors)
++  local laptop_enabled = false
++  for _, monitor in ipairs(monitors) do
++    if internal(monitor) then
++      laptop_enabled = true
++      -- Lua only enumerates enabled monitors on Hyprland 0.56.
++      local file = io.open(LAPTOP_FILE, "w")
++      if file then
++        file:write(identities[monitor.name], "\n")
++        file:close()
++      end
++      break
++    end
++  end
+   local focused_window = hl.get_active_window()
+   local focused_monitor = hl.get_active_monitor()
+   local focused_name = focused_monitor and focused_monitor.name
+@@ -584,7 +688,14 @@
+     for id in pairs(merged) do
+       ids[#ids + 1] = id
+     end
+-    table.sort(ids)
++    -- Free the laptop's borrowed slots before returning displaced workspaces.
++    table.sort(ids, function(left, right)
++      local a, b = merged[left].displaced == true, merged[right].displaced == true
++      if a ~= b then
++        return b
++      end
++      return left < right
++    end)
+
+     for _, id in ipairs(ids) do
+       local origin = merged[id]
+@@ -595,7 +706,7 @@
+         end
+       end
+
+-      if monitor then
++      if monitor and (not origin.displaced or laptop_enabled) then
+         merged[id] = nil
+         save_merged()
+
+@@ -605,8 +716,19 @@
+             hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(id), monitor = monitor.name }))
+           end
+
+-          if block_of_id(origin.id) == by_connector[monitor.name] and not hl.get_workspace(origin.id) then
++          local original_slot = hl.get_workspace(origin.id)
++          local active = monitor.active_workspace
++          local replace_empty = original_slot and original_slot.windows == 0 and original_slot.monitor
++            and original_slot.monitor.name == monitor.name and not merged[origin.id]
++          if block_of_id(origin.id) == by_connector[monitor.name] and (not original_slot or replace_empty) then
++            local replace_active = replace_empty and active and active.id == origin.id
++            if replace_empty then
++              renumber(original_slot, overflow_slot())
++            end
+             renumber(workspace, origin.id)
++            if replace_active then
++              show(monitor, origin.id)
++            end
+           elseif block_of_id(id) ~= by_connector[monitor.name] then
+             adopt(workspace, by_connector[monitor.name])
+           end
+@@ -623,7 +745,8 @@
+     local guests = {}
+     for _, workspace in ipairs(hl.get_workspaces()) do
+       if regular(workspace) and workspace.monitor and (workspace.windows or 0) > 0
+-        and not owner(workspace.id, monitors, by_connector) and by_connector[workspace.monitor.name] then
++        and not owner(workspace.id, monitors, by_connector) and by_connector[workspace.monitor.name]
++        and not (merged[workspace.id] and merged[workspace.id].displaced) then
+         guests[#guests + 1] = workspace
+       end
+     end
+@@ -654,6 +777,9 @@
+     own_views()
+   end
+   place()
++  if laptop then
++    changed = preserve_laptop_slots(laptop, external, by_connector, identities) or changed
++  end
+   merge()
+
+   -- Moving a visible workspace home leaves a gap Hyprland fills with anything.

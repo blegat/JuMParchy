@@ -31,3 +31,5 @@ while IFS= read -r -d '' src; do
 
   restore_default "config/$rel" "$dst" "$src" "$default"
 done < <(find "$CONFIG_SRC" -type f -print0)
+
+bash "$SCRIPT_DIR/clamshell-workspaces.sh" remove
