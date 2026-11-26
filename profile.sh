@@ -1,4 +1,5 @@
 alias gp='git push'
+alias gpf='git push --force-with-lease'
 
 # We only install nvim and not vim so let's make vim shortcut to nvim
 alias vim='nvim'
